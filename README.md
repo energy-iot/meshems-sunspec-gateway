@@ -1,10 +1,10 @@
-# SunSpec Integration for Sol-Ark Inverter
+# MeshEMS | Proprietary to SunSpec TCP Gateway for Sol-Ark Inverters
 
-This document describes the SunSpec compliance implementation for the Sol-Ark inverter in the EMS-Dev platform.
+This document describes the SunSpec compliance implementation for the Sol-Ark inverter with the MeshEMS platform.
 
 ## Overview
 
-This implementation allows the EMS-Dev platform to act as a SunSpec-compliant Modbus TCP/IP server, exposing Sol-Ark inverter data in a standardized format that can be read by any SunSpec-compatible client.
+This implementation allows the MeshEMS platform to act as a SunSpec-compliant Modbus TCP/IP server, exposing Sol-Ark inverter data in a standardized format that can be read by any SunSpec-compatible client.
 
 The implementation follows the SunSpec Alliance specifications and includes:
 - SunSpec Common Model (1) - Basic device information
