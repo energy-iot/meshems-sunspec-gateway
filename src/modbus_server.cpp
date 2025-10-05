@@ -71,7 +71,7 @@ void setup_modbus_server() {
   Serial.println("INFO - Modbus Client: Started as SunSpec-compliant TCP server on port 8502");
 }
 
-void loop_modbus_client() {
+void loop_modbus_server() {
   // Update SunSpec registers with latest Sol-Ark data
   update_sunspec_from_solark();
   

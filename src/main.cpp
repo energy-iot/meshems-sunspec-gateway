@@ -89,6 +89,6 @@ void setup() {
 void loop() {
     loop_buttons();
     loop_modbus_client();
-    loop_modbus_client();
+    loop_modbus_server();
     loop_display();
 }
