@@ -1,16 +1,9 @@
 #pragma once
 #include <ModbusIP_ESP8266.h>
 
-// WiFi credentials - these should be defined in a separate header file in practice
-
-// #define WIFI_SSID "SSID"
-// #define WIFI_PASSWORD "PASSWORD"
-
-//#define WIFI_SSID "Port Labs Members"
-//#define WIFI_PASSWORD "lesstalkmorewifi"
-
-#define WIFI_SSID "Port Labs Guest"
-#define WIFI_PASSWORD "connectandcollab"
+// WiFi credentials come from include/secrets.h, which is gitignored.
+// Copy secrets_example.h to secrets.h and fill in WIFI_SSID / WIFI_PW.
+#include <secrets.h>
 
 void setup_modbus_server();
 void loop_modbus_server();

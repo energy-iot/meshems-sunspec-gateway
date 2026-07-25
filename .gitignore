@@ -6,3 +6,6 @@
 .vscode/extensions.json
 .DS_Store
 .env
+
+# Local WiFi credentials - never commit
+include/secrets.h
