@@ -1,4 +1,6 @@
-# MeshEMS | Proprietary to SunSpec TCP Gateway for Sol-Ark Inverters
+# MeshEMS | Proprietary Application to SunSpec TCP Gateway for Sol-Ark Inverters
+
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/energy-iot/meshems-openami-metering/badge)](https://scorecard.dev/viewer/?uri=github.com/energy-iot/meshems-openami-metering)
 
 This document describes the SunSpec compliance implementation for the Sol-Ark inverter with the MeshEMS platform.
 
