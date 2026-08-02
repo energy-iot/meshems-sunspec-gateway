@@ -20,6 +20,10 @@
 // Create ModbusIP instance
 ModbusIP mb;
 
+// Max WiFi association attempts (1s apart) before giving up and booting without
+// a network. 
+int CONNECT_ATTEMPTS = 6;
+
 // Flag to track if SunSpec registers have been updated at least once
 bool sunspec_initialized = false;
 
@@ -30,19 +34,23 @@ void setup_modbus_server() {
   Serial.println("INFO - Modbus Client: SunSpec models initialized");
   Serial.println("INFO - Modbus Client: SunSpec Common (1) and Inverter (701) models available");
 
-  // Start WiFi connection
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-  
-  // Wait for WiFi connection
-  Serial.print("Connecting to WiFi");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
+  // Start WiFi connection. Bounded by an attempt count rather than blocking the
+  // boot forever - the RTU client and display still work without a network, so a
+  // failure here must not wedge setup().
+  int connect_attempts = CONNECT_ATTEMPTS;
+  Serial.printf("wifi connecting: %s\n", WIFI_SSID);
+  WiFi.begin(WIFI_SSID, WIFI_PW);
+  while (WiFi.status() != WL_CONNECTED && (connect_attempts-- > 0)) {
+    delay(1000);
+    Serial.printf("wifi failed to connect - retrying %s\n", WIFI_SSID);
   }
-  Serial.println();
-  Serial.print("Connected to WiFi. IP address: ");
-  Serial.println(WiFi.localIP());
-  
+  Serial.printf("wifi: %s: %s\n", WIFI_SSID,
+                WiFi.status() == WL_CONNECTED ? WiFi.localIP().toString().c_str() : "FAILED");
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WARN - WiFi: continuing without network; Modbus TCP will be unreachable");
+  }
+
   // Configure Modbus registers
   // For ModbusIP, we need to add each register individually
   // Add coils
