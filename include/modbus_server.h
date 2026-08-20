@@ -10,7 +10,7 @@
 //#define WIFI_PASSWORD "lesstalkmorewifi"
 
 #define WIFI_SSID "Informal Spaces Guest"
-#define WIFI_PASSWORD "connectandcollab"
+#define WIFI_PASSWORD "connectandcreate"
 
 void setup_modbus_server();
 void loop_modbus_server();
