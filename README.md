@@ -141,6 +141,8 @@ print(f"Cabinet Temperature: {inv.points['TmpCab'].value} °C")
 # Close the connection
 c.close()
 ```
+# Firmware Updates
+Follow https://github.com/energy-iot/meshems-openami-metering#dev-environment-installation-guide
 
 ## References
 
