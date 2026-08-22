@@ -1,3 +1,13 @@
+/**
+ * @file modbus_scanner.cpp
+ * @brief RS-485 bus diagnostic: probes every Modbus node address for a reply.
+ *
+ * Not called during normal operation — invoke scanModbusDevices() manually from
+ * setup_modbus_master() when commissioning an unknown bus.
+ */
+
+#ifdef ENABLE_MODBUS_MASTER
+
 #include <Arduino.h>
 #include <SoftwareSerial.h>
 #include <ModbusMaster.h>
@@ -51,3 +61,5 @@ void scanModbusDevices(SoftwareSerial &serialPort) {
     
     Serial.println("Modbus scan complete");
 }
+
+#endif // ENABLE_MODBUS_MASTER

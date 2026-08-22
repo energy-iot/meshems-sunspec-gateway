@@ -1,6 +1,7 @@
+#ifdef ENABLE_RELAYS
 #include <Arduino.h>
-#include <relay.h>
-#include <pins.h>
+#include <hw/relay.h>
+#include <core/pins.h>
 
 bool btn_toggle = false;
 
@@ -18,3 +19,5 @@ void setup_relays() {
     pinMode(RELAY_1_PIN,OUTPUT);
     digitalWrite(RELAY_1_PIN,LOW);
 }
+
+#endif // ENABLE_RELAYS

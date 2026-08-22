@@ -9,7 +9,7 @@
  */
 
  #include <Arduino.h>
- #include <data_model.h>
+ #include <core/data_model.h>
  
  /**
   * Coils (read-write digital outputs)

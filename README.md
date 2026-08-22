@@ -13,15 +13,117 @@ The implementation follows the SunSpec Alliance specifications and includes:
 - SunSpec Inverter Model (701) - AC Photovoltaic Inverter data
 - SunSpec DER Storage Capacity Model (713) - Battery storage information
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Architecture](#architecture)
+  - [Source Layout](#source-layout)
+- [Build Configuration](#build-configuration)
+  - [WiFi Credentials](#wifi-credentials)
+  - [Board Revisions](#board-revisions)
+- [SunSpec Model Implementation](#sunspec-model-implementation)
+- [Register Map](#register-map)
+- [Data Mapping](#data-mapping)
+- [Usage](#usage)
+- [Testing](#testing)
+- [Example TCP Client Connection](#example-tcp-client-connection)
+- [References](#references)
+
+## Features
+
+- Modbus RTU master on RS485_1 polling a Sol-Ark LV inverter
+- SunSpec-compliant Modbus TCP server (Models 1, 701, 713)
+- WiFi or W5500 SPI Ethernet uplink (mutually exclusive)
+- Optional MQTT telemetry of Sol-Ark data under the OpenAMI topic convention
+- Optional SH1106 OLED console, onboard SSR control, and SD card CSV logging
+- Feature-flag build system — compile only the subsystems you need
+
+All optional subsystems are guarded by `#ifdef` feature flags set in
+`platformio.ini`. See [`docs/FEATURE_FLAGS.md`](docs/FEATURE_FLAGS.md) for the
+full flag reference and example configurations.
+
+### Current Feature Status
+
+Active build flags (see `platformio.ini`): `ENABLE_WIFI`, `ENABLE_MODBUS_MASTER`,
+`ENABLE_MODBUS_TCP_SERVER`, `ENABLE_DEBUG`, `BOARD_VER_V3`.
+
+| Feature/Component | Status | Notes |
+|---|---|---|
+| Sol-Ark RTU polling (RS485_1) | Enabled | 9600 baud, node address `0x01` |
+| SunSpec Modbus TCP server | Enabled | Port 8502; override with `-DSUNSPEC_TCP_PORT=<n>` |
+| WiFi | Enabled | Credentials in gitignored `include/secrets.h` |
+| W5500 Ethernet | Available, disabled by default | `BOARD_VER_V3` only; mutually exclusive with WiFi |
+| MQTT telemetry | Available, disabled by default | Seven Sol-Ark subtopics + bandwidth stats |
+| OLED SH1106 display | Available, disabled by default | Console UI and boot splash |
+| SD card + Sol-Ark CSV log | Available, disabled by default | `BOARD_VER_V3` only |
+| Onboard SSR (GPIO 38) | Available, disabled by default | `ENABLE_RELAYS` |
+
 ## Architecture
 
 The implementation consists of the following components:
 
-1. **SunSpec Models Definition** (`include/sunspec_models.h`): Defines the SunSpec model structure, register maps, and constants.
+1. **SunSpec Models Definition** (`include/metering/sunspec_models.h`): Defines the SunSpec model structure, register maps, and constants.
 
-2. **SunSpec Mapper** (`src/sunspec_mapper.cpp`): Implements the mapping between Sol-Ark data and SunSpec registers.
+2. **SunSpec Mapper** (`src/metering/sunspec_mapper.cpp`): Implements the mapping between Sol-Ark data and SunSpec registers.
 
-3. **Modbus Client Integration** (`src/modbus_client.cpp`): Initializes the SunSpec models and updates the registers with Sol-Ark data.
+3. **Modbus RTU Master** (`src/metering/modbus_master.cpp`): Polls the Sol-Ark inverter on RS485_1 and maintains the decoded register cache.
+
+4. **Modbus TCP Server** (`src/metering/modbus_server.cpp`): Initializes the SunSpec models and serves the register map over TCP.
+
+### Source Layout
+
+```
+include/
+  core/      config.h  console.h  data_model.h  debug.h  pins.h
+  hw/        buttons.h  display.h  relay.h  sd_card.h  sd_logger.h
+  comms/     wifi.h  ethernet.h  mqtt_client.h
+  metering/  modbus.h  modbus_master.h  modbus_server.h  modbus_solark.h  sunspec_models.h
+  secrets_example.h        (copy to secrets.h — gitignored)
+src/
+  core/      main.cpp  config.cpp  console.cpp  data_model.cpp
+  hw/        buttons.cpp  display.cpp  relay.cpp  sd_card.cpp  sd_logger.cpp
+  comms/     wifi.cpp  ethernet.cpp  mqtt_client.cpp
+  metering/  modbus_master.cpp  modbus_server.cpp  modbus_solark.cpp
+             modbus_scanner.cpp  sunspec_mapper.cpp
+docs/        FEATURE_FLAGS.md  CHANGELOG.md  AGENTS.md
+scripts/     pick_serial_port.py
+utilities/   sunspec_client_example.py  test_sunspec_registers.py  requirements.txt
+```
+
+## Build Configuration
+
+Features are selected with `-D` flags in the `[common] build_flags` section of
+`platformio.ini`. Invalid combinations fail at compile time with a descriptive
+`#error` rather than misbehaving at runtime — see
+[`docs/FEATURE_FLAGS.md`](docs/FEATURE_FLAGS.md).
+
+```bash
+pio run              # build
+pio run -t upload    # build and flash (port auto-selected)
+pio device monitor   # 115200 baud
+```
+
+### WiFi Credentials
+
+Credentials are not stored in tracked source. Before building with `-DENABLE_WIFI`:
+
+```bash
+cp include/secrets_example.h include/secrets.h
+# edit include/secrets.h and set WIFI_SSID / WIFI_PW
+```
+
+### Board Revisions
+
+Exactly one board revision macro must be set in `platformio.ini`:
+
+| Flag | Board |
+|---|---|
+| `BOARD_VER_V3` | NESL EMS Controller PCBA 865B (default) |
+| `BOARD_VER_V1` | Legacy hand-soldered 2025 prototype |
+| `BOARD_VER_V2` | Legacy 2025 board with swapped RS-485 module pins |
+
+SD card and Ethernet pins exist only on `BOARD_VER_V3`.
 
 ## SunSpec Model Implementation
 
@@ -98,9 +200,9 @@ The implementation maps Sol-Ark data to SunSpec registers as follows:
 ## Usage
 
 The SunSpec-compliant Modbus TCP/IP server runs with the following settings:
-- WiFi: Connects to an existing WiFi network
-- IP Address: Dynamically assigned by DHCP (displayed on the OLED screen)
-- TCP Port: 8502
+- Network: WiFi (`ENABLE_WIFI`) or W5500 Ethernet (`ENABLE_ETHERNET`)
+- IP Address: Dynamically assigned by DHCP (displayed on the OLED screen when `ENABLE_OLED_DISPLAY` is set)
+- TCP Port: 8502 by default — override with `-DSUNSPEC_TCP_PORT=<n>`
 - Protocol: Modbus TCP/IP
 
 Any SunSpec-compatible Modbus TCP client can connect to this server to read the standardized inverter data.
@@ -111,7 +213,7 @@ You can test the SunSpec implementation using:
 1. SunSpec-compatible client software (e.g., SunSpec Dashboard)
 2. Modbus TCP polling tools with the appropriate register map (e.g., ModbusPoll, QModMaster)
 3. pysunspec2 library for Python-based testing (with TCP transport)
-4. Example Python script in examples/sunspec_client_example.py (modified for TCP)
+4. Example Python script in utilities/sunspec_client_example.py (modified for TCP)
 
 ## Example TCP Client Connection
 

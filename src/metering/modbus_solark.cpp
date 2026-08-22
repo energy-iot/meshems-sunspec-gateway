@@ -1,4 +1,6 @@
-#include <modbus_solark.h>
+#ifdef ENABLE_MODBUS_MASTER
+
+#include <metering/modbus_solark.h>
 #include <TimeLib.h>
 
 #define SOLARK_POLL_INTERVAL 5000 // 5 seconds
@@ -529,3 +531,5 @@ uint16_t Modbus_SolArkLV::getBMSWarning() {
 uint16_t Modbus_SolArkLV::getBMSFault() {
     return bms_fault;
 }
+
+#endif // ENABLE_MODBUS_MASTER
