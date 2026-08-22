@@ -1,5 +1,6 @@
-#include <console.h>
-#include <display.h>
+#ifdef ENABLE_OLED_DISPLAY
+#include <core/console.h>
+#include <hw/display.h>
 
 Console _console;
 
@@ -20,8 +21,10 @@ void Console::redrawConsole() {
     display->clear();
     display->setTextAlignment(TEXT_ALIGN_LEFT);
     display->setFont(ArialMT_Plain_10);   
-    for(int i=0;i<NUM_LINES;i++) { //if no overla, start at 0
-        int y = i+1 * 10;
+    for(int i=0;i<NUM_LINES;i++) {
+        // Parenthesise: without them '*' binds first and every line lands
+        // within 5 px of y=10, overlapping into unreadable text.
+        int y = (i + 1) * FIRST_LINE_Y_OFFSET;
         display->drawString(0, y, consoleLog[i]); 
         //SerialPins.println(consoleLog[i]);
     }
@@ -62,3 +65,5 @@ void Console::addLine_append(String appendStr) {
     consoleLog[logLinePtr - 1].concat(appendStr);
     redrawConsole();
 }
+
+#endif // ENABLE_OLED_DISPLAY

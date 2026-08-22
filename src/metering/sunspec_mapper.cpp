@@ -1,9 +1,16 @@
-#include <sunspec_models.h>
-#include <data_model.h>
-#include <modbus_solark.h>
+/**
+ * @file sunspec_mapper.cpp
+ * @brief Maps the decoded Sol-Ark register cache into the SunSpec register map.
+ *
+ * Only compiled when the RS-485 master is active — without it there is no
+ * inverter data to map.
+ */
 
-// External reference to the Sol-Ark instance
-extern Modbus_SolArkLV solark;
+#ifdef ENABLE_MODBUS_MASTER
+
+#include <metering/sunspec_models.h>
+#include <core/data_model.h>
+#include <metering/modbus_master.h>
 
 // Helper function to set a string in the register map
 void set_sunspec_string(uint16_t* registers, const char* str, uint8_t max_len) {
@@ -290,3 +297,5 @@ void update_sunspec_from_solark() {
     holdingRegisters[end_offset] = 0xFFFF;
     holdingRegisters[end_offset + 1] = 0x0000;
 }
+
+#endif // ENABLE_MODBUS_MASTER

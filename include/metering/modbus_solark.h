@@ -1,6 +1,6 @@
 #pragma once
 
-#include <modbus_client.h>
+#include <ModbusMaster.h>
 
 // Register mapping structure for Sol-Ark
 struct SolArkRegisterMap {

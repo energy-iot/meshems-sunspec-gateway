@@ -24,9 +24,12 @@ SOFTWARE.
 
 See more at http://blog.squix.ch
 */
-#include <display.h>
-#include <console.h>
-#include <pins.h>
+
+#ifdef ENABLE_OLED_DISPLAY
+
+#include <hw/display.h>
+#include <core/console.h>
+#include <core/pins.h>
 
 // Uncomment one of the following based on OLED type
 // SH1106(bool HW_SPI, int rst, int dc, int cs );
@@ -287,3 +290,5 @@ void loop_display() {
   //}
   show_seconds_counter();
 }
+
+#endif // ENABLE_OLED_DISPLAY

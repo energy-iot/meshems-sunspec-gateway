@@ -1,18 +1,22 @@
 /**
  * @file modbus_master.cpp
- * @brief Modbus master implementation for SHT20 temperature/humidity sensors
+ * @brief Modbus RTU master on RS485_1 — polls the Sol-Ark LV inverter.
+ *
+ * The decoded register cache lives in the Modbus_SolArkLV instance; the SunSpec
+ * mapper, MQTT publisher, and SD logger all read from it.
  */
 
- #include <SoftwareSerial.h>
- #include <modbus.h>
- #include <pins.h>
- #include <data_model.h>
- #include <console.h>
+#ifdef ENABLE_MODBUS_MASTER
 
- // Declare the scanner function
-void scanModbusDevices(SoftwareSerial &serialPort);
+#include <SoftwareSerial.h>
+#include <core/config.h>
+#include <core/console.h>
+#include <core/data_model.h>
+#include <core/debug.h>
+#include <core/pins.h>
+#include <metering/modbus_master.h>
 
- // ModbusMaster success/failure constants if not defined
+// ModbusMaster success/failure constants if not defined
 #ifndef ku8MBSuccess
 #define ku8MBSuccess 0x00
 #define ku8MBIllegalFunction 0x01
@@ -23,60 +27,41 @@ void scanModbusDevices(SoftwareSerial &serialPort);
 #define ku8MBInvalidCRC 0xE1
 #define ku8MBInvalidSlaveID 0xE2
 #endif
-  
- #define SOLARK_POLL_INTERVAL 1000  // Poll every 1 seconds
 
-// ==================== Modbus Device Setup ====================
- #define SOLARK_ADDR 0x01  // Adjust this to match your SolArk device address
- #define DEVICE_BAUD_RATE 9600 // Default, Sol-Ark only supports 9600 baud
- 
- // ==================== Serial Interface Setup ====================
- // RS485 serial connections
- SoftwareSerial _modbus1(RS485_RX_1, RS485_TX_1); // Client - HW519 module
- 
- // Not Used for the SunSpec TCP/IP Modbus Bridge, could be used for SunSpec Modbus RTU
- //SoftwareSerial *modbus2(RS485_RX_2, RS485_TX_2); // Server - HW519 module
+// ==================== Serial Interface Setup ====================
+// RS485_1 carries the Sol-Ark link. RS485_2 is unused by the TCP gateway but is
+// wired for a future SunSpec Modbus RTU server.
+static SoftwareSerial _modbus1(RS485_1_RX, RS485_1_TX); // HW-519 module
 
- //the Sol-Ark Low Voltage Inverter
+// The Sol-Ark Low Voltage inverter
 Modbus_SolArkLV solark;
- 
- // Timing variables
- unsigned long lastMillis, lastSolArkMillis = 0;
 
-// Add this function to initialize the SolArk device
-void setup_solark() {
-  Serial.printf("SETUP: MODBUS: SolArk #1: address:%d\n", SOLARK_ADDR);
-  solark.begin(SOLARK_ADDR, _modbus1); // Initialize a new instance of the Sol-Ark class on the CLIENT RS485 interface
+static unsigned long lastSolArkMillis = 0;
+static unsigned long solark_success_count = 0;
+
+unsigned long get_solark_success_count() {
+    return solark_success_count;
 }
- 
- /**
-  * Initialize all Modbus clients
-  */
- void setup_modbus_clients() {
-     setup_solark();           // Initialize Sol-Ark LV device
- }
- 
- /**
-  * Initialize Modbus master interface
-  */
- void setup_modbus_client_interface() {
-     // Reset GPIO pins for RS485
-     gpio_reset_pin(RS485_RX_1);
-     gpio_reset_pin(RS485_TX_1);
-     gpio_reset_pin(RS485_RX_2);
-     gpio_reset_pin(RS485_TX_2);
- 
-     _modbus1.begin(DEVICE_BAUD_RATE);    // Initialize serial at 9600 baud
-     
-     setup_modbus_clients();              // Setup connected devices
 
-    // Scan for devices - output only to Serial, not console
-    // Serial.println("Scanning for devices...");
-    // Serial.println("Port 1:");
-    // scanModbusDevices(_modbus1);
- }
+// Bind the Sol-Ark instance to its node address on the RS485_1 UART.
+static void setup_solark() {
+    Serial.printf("SETUP: MODBUS: SolArk #1: address:%d\n", SOLARK_ADDR);
+    solark.begin(SOLARK_ADDR, _modbus1);
+}
 
- void printBatteryStatus() {
+// Bring up the RS485_1 UART and every device attached to it.
+void setup_modbus_master() {
+    gpio_reset_pin(RS485_1_RX);
+    gpio_reset_pin(RS485_1_TX);
+
+    _modbus1.begin(SOLARK_BAUD_RATE);
+
+    setup_solark();
+}
+
+#ifdef ENABLE_DEBUG
+// Human-readable dumps of the decoded register cache. Debug builds only.
+static void printBatteryStatus() {
     Serial.println("BATTERY STATUS:");
     Serial.printf("  Power:       %.1f W\n", solark.getBatteryPower());
     Serial.printf("  Current:     %.2f A\n", solark.getBatteryCurrent());
@@ -101,7 +86,7 @@ void setup_solark() {
    }
  }
  
- void printGridStatus() {
+static void printGridStatus() {
     Serial.println("GRID STATUS:");
     Serial.printf("  Power:       %.1f W\n", solark.getGridPower());
     Serial.printf("  Voltage:     %.1f V\n", solark.getGridVoltage());
@@ -130,7 +115,7 @@ void setup_solark() {
     }
   }
   
-  void printPVStatus() {
+ static void printPVStatus() {
     Serial.println("SOLAR PV STATUS:");
     Serial.printf("  PV1 Power:   %.1f W\n", solark.getPV1Power());
     Serial.printf("  PV2 Power:   %.1f W\n", solark.getPV2Power());
@@ -138,7 +123,7 @@ void setup_solark() {
     Serial.printf("  Total Power: %.3f kW\n", solark.getPVPowerTotal());
   }
   
-  void printLoadStatus() {
+ static void printLoadStatus() {
     Serial.println("LOAD STATUS:");
     Serial.printf("  Load L1:     %.1f W\n", solark.getLoadPowerL1());
     Serial.printf("  Load L2:     %.1f W\n", solark.getLoadPowerL2());
@@ -147,7 +132,7 @@ void setup_solark() {
     Serial.printf("  Frequency:   %.2f Hz\n", solark.getLoadFrequency());
   }
   
-  void printEnergyMeters() {
+ static void printEnergyMeters() {
     Serial.println("ENERGY METERS (kWh):");
     Serial.printf("  Battery Charge:    %.1f kWh\n", solark.getBatteryChargeEnergy());
     Serial.printf("  Battery Discharge: %.1f kWh\n", solark.getBatteryDischargeEnergy());
@@ -157,7 +142,7 @@ void setup_solark() {
     Serial.printf("  PV Generation:     %.1f kWh\n", solark.getPVEnergy());
   }
 
-  void printInverterDetails() {
+ static void printInverterDetails() {
     Serial.println("INVERTER DETAILS:");
     Serial.printf("  Comm Version: %u\n", solark.getCommVersion());
     
@@ -179,32 +164,38 @@ void setup_solark() {
     Serial.printf("  DCDC Temp:   %.1f°C\n", solark.getDCDCTemp());
     Serial.printf("  IGBT Temp:   %.1f°C\n", solark.getIGBTTemp());
   }
+#endif // ENABLE_DEBUG
 
- void loop_solark() {
-    if (millis() - lastSolArkMillis > SOLARK_POLL_INTERVAL) {
-        Serial.println("Poll SolArk inverter");
-        uint8_t result = solark.poll();
-        if (result == 0) { // 0 = ku8MBSuccess
-            // Display the decoded values
-            printInverterDetails();
-            printBatteryStatus();
-            printGridStatus();
-            printPVStatus();
-            printLoadStatus();
-            printEnergyMeters();
-          } else {
-            Serial.println("Error polling SolArk inverter");
-          }
-          
-        Serial.println("-------------------------------------");
-        lastSolArkMillis = millis();
+// Poll the inverter on its own rate timer and refresh the register cache.
+// Full status is dumped to Serial only in debug builds; the SunSpec register
+// map is updated regardless by modbus_server's loop.
+static void loop_solark() {
+    if (millis() - lastSolArkMillis <= (unsigned long)SolArkPoll_rate) return;
+    lastSolArkMillis = millis();
+
+    DBUGLN("Poll SolArk inverter");
+    uint8_t result = solark.poll();
+    if (result != ku8MBSuccess) {
+        Serial.println("Error polling SolArk inverter");
+        return;
     }
+
+    solark_success_count++;
+
+#ifdef ENABLE_DEBUG
+    printInverterDetails();
+    printBatteryStatus();
+    printGridStatus();
+    printPVStatus();
+    printLoadStatus();
+    printEnergyMeters();
+    Serial.println("-------------------------------------");
+#endif
 }
 
- /**
-  * Main polling loop for Modbus communication
-  */
- void loop_modbus_client() {
-     // Poll Sol-Ark at its own interval
-     loop_solark();
- }
+// Main polling entry point for the RS-485 master side.
+void loop_modbus_master() {
+    loop_solark();
+}
+
+#endif // ENABLE_MODBUS_MASTER
